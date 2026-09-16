@@ -1,4 +1,4 @@
-﻿using Dalamud.Hooking;
+using Dalamud.Hooking;
 using Dalamud.Utility.Signatures;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
@@ -109,15 +109,15 @@ namespace AoAoEnergy
         }
 
         public delegate void* GetResourceAsyncDelegate(IntPtr resourceManager, uint* categoryId, uint* resourceType,
-            int* resourceHash, byte* path, GetResourceParameters* resParams, bool isUnknown);
+            int* resourceHash, byte* path, GetResourceParameters* resParams, byte isUnknown, byte* debugFile, uint debugLine);
         [Signature("E8 ?? ?? ?? 00 48 8B D8 EB ?? F0 FF 83 ?? ?? 00 00", DetourName = nameof(GetResourceAsyncDetour))]
         private Hook<GetResourceAsyncDelegate> GetResourceAsyncHook;
         private void* GetResourceAsyncDetour(IntPtr resourceManager, uint* categoryId, uint* resourceType,
-            int* resourceHash, byte* path, GetResourceParameters* resParams, bool isUnknown)
+            int* resourceHash, byte* path, GetResourceParameters* resParams, byte isUnknown, byte* debugFile, uint debugLine)
         {
             if (!Utf8GamePath.FromPointer(path, MetaDataComputation.None, out var gamePath))
             {
-                return GetResourceAsyncHook.Original(resourceManager, categoryId, resourceType, resourceHash, path, resParams, isUnknown);
+                return GetResourceAsyncHook.Original(resourceManager, categoryId, resourceType, resourceHash, path, resParams, isUnknown, debugFile, debugLine);
             }
 
             var gamePathString = gamePath.ToString();
@@ -126,7 +126,7 @@ namespace AoAoEnergy
 
             if (replacedPath == null || replacedPath.Length >= 260)
             {
-                var unreplaced = GetResourceAsyncHook.Original(resourceManager, categoryId, resourceType, resourceHash, path, resParams, isUnknown);
+                var unreplaced = GetResourceAsyncHook.Original(resourceManager, categoryId, resourceType, resourceHash, path, resParams, isUnknown, debugFile, debugLine);
                 //Plugin.PluginLog.Debug($"[GetResourceHandler] ORIGINAL: {gamePathString} -> " + new IntPtr(unreplaced).ToString("X8"));
                 return unreplaced;
             }
@@ -137,7 +137,7 @@ namespace AoAoEnergy
             *resourceHash = ComputeHash(resolvedPath.InternalName, resParams);
             path = resolvedPath.InternalName.Path;
 
-            var replaced = GetResourceAsyncHook.Original(resourceManager, categoryId, resourceType, resourceHash, path, resParams, isUnknown);
+            var replaced = GetResourceAsyncHook.Original(resourceManager, categoryId, resourceType, resourceHash, path, resParams, isUnknown, debugFile, debugLine);
             //Plugin.PluginLog.Debug($"[GetResourceHandler] REPLACED: {gamePathString} -> {replacedPath} -> " + new IntPtr(replaced).ToString("X8"));
             return replaced;
 
@@ -180,7 +180,7 @@ namespace AoAoEnergy
         private Hook<ReadSqpackDelegate> ReadSqpackHook;
         private byte ReadSqpackDetour(IntPtr fileHandler, SeFileDescriptor* fileDesc, int priority, bool isSync)
         {
-            if (fileDesc->ResourceHandle == null) return ReadSqpackHook.Original(fileHandler, fileDesc, priority, isSync);
+            if (fileDesc == null || fileDesc->ResourceHandle == null) return ReadSqpackHook.Original(fileHandler, fileDesc, priority, isSync);
 
             if (!fileDesc->ResourceHandle->GamePath(out var originalGamePath))
             {
@@ -207,7 +207,8 @@ namespace AoAoEnergy
             }
 
             // call the original if it's a penumbra path that doesn't need replacement as well
-            if (gameFsPath == null || gameFsPath.Length >= 260 || !isRooted || isPenumbra)
+            if (gameFsPath == null || gameFsPath.Length >= 260 || !isRooted || isPenumbra
+                || !RepalcePaths.Values.Contains(gameFsPath, StringComparer.OrdinalIgnoreCase))
             {
                 //Plugin.PluginLog.Debug($"[ReadSqpackHandler] ORIGINAL: {originalPath}");
                 return ReadSqpackHook.Original(fileHandler, fileDesc, priority, isSync);
@@ -220,9 +221,10 @@ namespace AoAoEnergy
             ByteString.FromString(gameFsPath, out var gamePath);
 
             // note: must be utf16
-            var utfPath = Encoding.Unicode.GetBytes(gameFsPath);
+            var utfPath = Encoding.Unicode.GetBytes(gameFsPath + '\0');
             Marshal.Copy(utfPath, 0, new IntPtr(&fileDesc->Utf16FileName), utfPath.Length);
             var fd = stackalloc byte[0x20 + utfPath.Length + 0x16];
+            new Span<byte>(fd, 0x20 + utfPath.Length + 0x16).Clear();
             Marshal.Copy(utfPath, 0, new IntPtr(fd + 0x21), utfPath.Length);
             fileDesc->FileDescriptor = fd;
 
@@ -267,10 +269,22 @@ namespace AoAoEnergy
 
         public ResourceLoader()
         {
-            Plugin.GameInteropProvider.InitializeFromAttributes(this);
-            ReadFile = Marshal.GetDelegateForFunctionPointer<ReadFileDelegate>(Plugin.SigScanner.ScanText("48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 41 54 41 55 41 56 41 57 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 63 42"));
-            this.GetResourceAsyncHook?.Enable();
-            this.ReadSqpackHook?.Enable();
+            try
+            {
+                Plugin.GameInteropProvider.InitializeFromAttributes(this);
+                ReadFile = Marshal.GetDelegateForFunctionPointer<ReadFileDelegate>(Plugin.SigScanner.ScanText("48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 41 54 41 55 41 56 41 57 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 63 42"));
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
+        }
+
+        public void Enable()
+        {
+            GetResourceAsyncHook.Enable();
+            ReadSqpackHook.Enable();
         }
         public void Dispose() {
             this.GetResourceAsyncHook?.Dispose();

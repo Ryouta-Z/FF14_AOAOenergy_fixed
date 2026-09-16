@@ -1,4 +1,4 @@
-﻿using Dalamud.Game;
+using Dalamud.Game;
 using Dalamud.Hooking;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -64,9 +64,9 @@ namespace AoAoEnergy
         //private Hook<ApplyOneTargetEffectDelegate> ApplyOneTargetEffectHook;
         private void CreateResultVfxDetour(ActionEffectHandler* actionHandler, Character* cast, Character* target, uint action, Effect* result)
         {
-            if (result->Type == 14 && result->Value == 49)
+            if (result != null && result->Type == 14 && result->Value == 49 && cast != null && target != null)
             {
-                if (((nint)cast != 0 || IsShowInCarema(cast)) && ((nint)target != 0 || IsShowInCarema(target)))
+                if (CreateVfx != null)
                 {
                     //foreach (var item in actionHandler->IncomingEffects)
                     //{
@@ -85,21 +85,30 @@ namespace AoAoEnergy
         private delegate IntPtr CreateVfxDelegate(string path, GameObject* cast, GameObject* target, float speed, char a5, ushort a6, char a7);
         private CreateVfxDelegate CreateVfx;
 
-        private delegate bool IsShowInCaremaDelegate(Character* chara);
-        private IsShowInCaremaDelegate IsShowInCarema;
-
         //private PenumbraService PenumbraService;
         private ResourceLoader ResourceLoader;
 
         public Plugin()
         {
-            //InitMod();
-            GameInteropProvider.InitializeFromAttributes(this);
-            ResourceLoader = new ResourceLoader();
-            ResourceLoader.AddReplace(AoAoVfxPath, Path.Combine(PluginInterface.AssemblyLocation.Directory!.FullName, "ev_energydrink_01x_30s.avfx"));
-            this.CreateVfx = Marshal.GetDelegateForFunctionPointer<CreateVfxDelegate>(SigScanner.ScanText("E8 ?? ?? ?? ?? 48 8B D8 48 85 C0 74 27 B2 01"));
-            this.IsShowInCarema = Marshal.GetDelegateForFunctionPointer<IsShowInCaremaDelegate>(SigScanner.ScanText("40 53 48 83 EC 20 48 8B 01 48 8B D9 FF 50 ?? 83 F8 08 75 ?? 0F B7 83"));
-            CreateResultVfxHook?.Enable();
+            try
+            {
+                var replacement = Path.Combine(PluginInterface.AssemblyLocation.Directory!.FullName, "ev_energydrink_01x_30s.avfx");
+                if (!File.Exists(replacement) || replacement.Length >= 260)
+                    throw new InvalidOperationException("AoAoEnergy VFX file is missing or its path is too long. Extract the complete package to a shorter path.");
+
+                GameInteropProvider.InitializeFromAttributes(this);
+                this.CreateVfx = Marshal.GetDelegateForFunctionPointer<CreateVfxDelegate>(SigScanner.ScanText("40 53 55 56 57 48 81 EC ?? ?? ?? ?? 0F 29 B4 24 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 0F B6 AC 24 ?? ?? ?? ?? 0F 28 F3 49 8B F8"));
+                ResourceLoader = new ResourceLoader();
+                ResourceLoader.AddReplace(AoAoVfxPath, replacement);
+                ResourceLoader.Enable();
+                (CreateResultVfxHook ?? throw new InvalidOperationException("AoAoEnergy result VFX hook was not initialized.")).Enable();
+                PluginLog.Info("AoAoEnergy CN API 15 test build 1.0.3.3: hooks initialized; verified offline against game 2026.09.01.0000.0000; in-game VFX behavior remains unverified.");
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         public void Dispose()
