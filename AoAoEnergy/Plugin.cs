@@ -103,12 +103,15 @@ namespace AoAoEnergy
 
         private delegate IntPtr ActorVfxRemoveDelegate(IntPtr vfx, char a2);
         private Hook<ActorVfxRemoveDelegate> ActorVfxRemoveHook;
+        private const char ImmediateRemovalMode = (char)1;
 
         //private PenumbraService PenumbraService;
         private ResourceLoader ResourceLoader;
         private Configuration Configuration;
         private ConfigurationWindow ConfigurationWindow;
         private readonly ActiveVfxTracker ActiveVfx = new();
+        private readonly object LifecycleGate = new();
+        private bool IsDisposed;
 
         internal bool RememberPerCharacter => Configuration.OffsetProfiles.RememberPerCharacter;
         internal int SelectedOffsetIndex => Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
@@ -151,6 +154,13 @@ namespace AoAoEnergy
 
         public void Dispose()
         {
+            lock (LifecycleGate)
+            {
+                if (IsDisposed)
+                    return;
+                IsDisposed = true;
+            }
+
             if (ConfigurationWindow != null)
                 PluginInterface.UiBuilder.Draw -= ConfigurationWindow.Draw;
             PluginInterface.UiBuilder.OpenConfigUi -= OpenConfiguration;
@@ -174,39 +184,71 @@ namespace AoAoEnergy
 
         internal void PreviewSelectedEffect()
         {
+            lock (LifecycleGate)
+            {
+                if (IsDisposed)
+                    return;
+            }
             _ = Framework.RunOnFrameworkThread(PreviewOnFrameworkThread);
         }
 
         internal void ClearActiveEffects()
         {
+            lock (LifecycleGate)
+            {
+                if (IsDisposed)
+                    return;
+            }
             _ = Framework.RunOnFrameworkThread(ClearActiveEffectsOnFrameworkThread);
         }
 
         private void PreviewOnFrameworkThread()
         {
-            var localPlayer = ObjectTable.LocalPlayer;
-            if (localPlayer == null || localPlayer.Address == IntPtr.Zero)
+            lock (LifecycleGate)
             {
-                PluginLog.Warning("AoAoEnergy preview skipped because the local player is unavailable.");
-                return;
-            }
+                if (IsDisposed)
+                    return;
 
-            var character = (Character*)localPlayer.Address;
-            PlaySelectedVfx(&character->GameObject, &character->GameObject);
+                var localPlayer = ObjectTable.LocalPlayer;
+                if (localPlayer == null || localPlayer.Address == IntPtr.Zero)
+                {
+                    PluginLog.Warning("AoAoEnergy preview skipped because the local player is unavailable.");
+                    return;
+                }
+
+                var character = (Character*)localPlayer.Address;
+                PlaySelectedVfx(&character->GameObject, &character->GameObject);
+            }
         }
 
         private void OpenConfiguration() => ConfigurationWindow.IsOpen = true;
 
         private IntPtr ActorVfxRemoveDetour(IntPtr vfx, char a2)
         {
-            ActiveVfx.Untrack(vfx);
+            if (!ActiveVfx.ShouldProcessNaturalRemoval(vfx))
+                return IntPtr.Zero;
             return ActorVfxRemoveHook.Original(vfx, a2);
         }
 
         private void ClearActiveEffectsOnFrameworkThread()
         {
-            foreach (var vfx in ActiveVfx.Drain())
-                ActorVfxRemoveHook.Original(vfx, (char)1);
+            lock (LifecycleGate)
+            {
+                if (IsDisposed)
+                    return;
+
+                var claimedVfx = ActiveVfx.ClaimAllForRemoval();
+                try
+                {
+                    foreach (var vfx in claimedVfx)
+                        ActorVfxRemoveHook.Original(vfx, ImmediateRemovalMode);
+                }
+                finally
+                {
+                    foreach (var vfx in claimedVfx)
+                        ActiveVfx.CompleteRemoval(vfx);
+                }
+            }
         }
 
         private void SaveConfiguration() => PluginInterface.SavePluginConfig(Configuration);
@@ -215,9 +257,15 @@ namespace AoAoEnergy
 
         private void PlaySelectedVfx(GameObject* cast, GameObject* target)
         {
-            var presetIndex = Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
-            var vfx = CreateVfx?.Invoke(OffsetPresets[presetIndex].VirtualPath, cast, target, -1, (char)0, 0, (char)0) ?? IntPtr.Zero;
-            ActiveVfx.Track(vfx);
+            lock (LifecycleGate)
+            {
+                if (IsDisposed)
+                    return;
+
+                var presetIndex = Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
+                var vfx = CreateVfx?.Invoke(OffsetPresets[presetIndex].VirtualPath, cast, target, -1, (char)0, 0, (char)0) ?? IntPtr.Zero;
+                ActiveVfx.Track(vfx);
+            }
         }
     }
 }

@@ -30,10 +30,13 @@ var activeVfx = new ActiveVfxTracker();
 activeVfx.Track((nint)0x111);
 activeVfx.Track((nint)0x222);
 activeVfx.Track((nint)0x222);
-activeVfx.Untrack((nint)0x111);
-var handlesToRemove = activeVfx.Drain();
+Equal(1, activeVfx.ShouldProcessNaturalRemoval((nint)0x111) ? 1 : 0, "natural removal owns a live tracked VFX");
+var handlesToRemove = activeVfx.ClaimAllForRemoval();
 Equal(1, handlesToRemove.Count, "only live unique VFX instances are cleared");
 Equal(0x222, (int)handlesToRemove[0], "the remaining VFX handle is returned for removal");
-Equal(0, activeVfx.Drain().Count, "clearing the VFX list is idempotent");
+Equal(0, activeVfx.ShouldProcessNaturalRemoval((nint)0x222) ? 1 : 0, "natural removal cannot race a VFX claimed by clear");
+activeVfx.CompleteRemoval((nint)0x222);
+Equal(1, activeVfx.ShouldProcessNaturalRemoval((nint)0x999) ? 1 : 0, "unrelated VFX removal is never blocked");
+Equal(0, activeVfx.ClaimAllForRemoval().Count, "clearing the VFX list is idempotent");
 
 Console.WriteLine("PASS offset profile behavior");
