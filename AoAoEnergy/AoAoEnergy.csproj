@@ -3,12 +3,12 @@
 	<PropertyGroup>
 		<Name>AoAoEnergy</Name>
 		<Author>Loskh</Author>
-		<Punchline>宣传是用于新人的怪怪的能量饮料。 (将爆发药特效替换为嗷嗷有劲的RGB)</Punchline>
-		<Description>可我还要打本啊！为了不睡过去，我需要补充能量。这时候就轮到我最爱的能量饮料登场了…… [非官方国服 API 15 本地测试构建；尚未完成游戏内验证。]</Description>
+		<Punchline>将强化药（爆发药）特效替换为充满活力的 RGB 能量光效。</Punchline>
+		<Description>使用强化药（爆发药）时，为角色播放嗷嗷有劲的 RGB 能量光效。支持六档垂直位置调节、无需消耗爆发药的即时预览、一键清除当前光效，并可按角色分别记住高度设置。原作者：Loskh。本版本为私人修复版本。</Description>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-		<Version>1.0.4.1</Version>
+		<Version>1.0.4.2</Version>
 		<IncludeSymbols>False</IncludeSymbols>
         <ApplicableVersion>2026.09.01.0000.0000</ApplicableVersion>
 	</PropertyGroup>

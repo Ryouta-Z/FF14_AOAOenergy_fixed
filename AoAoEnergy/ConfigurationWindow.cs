@@ -27,7 +27,7 @@ internal sealed class ConfigurationWindow
         }
         IsOpen = isOpen;
 
-        ImGui.TextWrapped("调整爆发药 RGB 特效的垂直位置。默认的“原始位置”适合未使用骨骼修复的人物。");
+        ImGui.TextWrapped("调整爆发药 RGB 光效的垂直位置，以适配不同种族和角色身高。如果使用了骨骼修复等 Mod，可能导致光效位置偏移，可在高度选项中自行调节。");
 
         var rememberPerCharacter = plugin.RememberPerCharacter;
         if (ImGui.Checkbox("按当前角色分别记住", ref rememberPerCharacter))

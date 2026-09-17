@@ -2,21 +2,26 @@
   {
     "Name": "AoAoEnergy",
     "Author": "Loskh",
-    "Punchline": "宣传是用于新人的怪怪的能量饮料。 (将爆发药特效替换为嗷嗷有劲的RGB)",
-    "Description": "可我还要打本啊！为了不睡过去，我需要补充能量。这时候就轮到我最爱的能量饮料登场了…… [非官方国服 API 15 本地测试构建；尚未完成游戏内验证。]",
+    "Punchline": "将强化药（爆发药）特效替换为充满活力的 RGB 能量光效。",
+    "Description": "使用强化药（爆发药）时，为角色播放嗷嗷有劲的 RGB 能量光效。支持六档垂直位置调节、无需消耗爆发药的即时预览、一键清除当前光效，并可按角色分别记住高度设置。原作者：Loskh。本版本为私人修复版本。",
     "Tags": [
       "VFX",
       "AVFX"
     ],
     "InternalName": "AoAoEnergy",
-    "AssemblyVersion": "1.0.4.1",
-    "TestingAssemblyVersion": "1.0.4.1",
+    "AssemblyVersion": "1.0.4.2",
+    "TestingAssemblyVersion": "1.0.4.2",
     "ApplicableVersion": "2026.09.01.0000.0000",
     "DalamudApiLevel": 15,
     "IsHide": false,
-    "IsTestingExclusive": true,
+    "IsTestingExclusive": false,
     "DownloadCount": 0,
-    "LastUpdate": 0,
-    "IconUrl": "https://cafemaker.wakingsands.com/i/024000/024420_hr1.png"
+    "LastUpdate": 1789623602,
+    "IconUrl": "https://cafemaker.wakingsands.com/i/024000/024420_hr1.png",
+    "RepoUrl": "https://github.com/Ryouta-Z/FF14_AOAOenergy_fixed",
+    "DownloadLinkInstall": "https://raw.githubusercontent.com/Ryouta-Z/FF14_AOAOenergy_fixed/master/dist/AoAoEnergy.zip",
+    "DownloadLinkUpdate": "https://raw.githubusercontent.com/Ryouta-Z/FF14_AOAOenergy_fixed/master/dist/AoAoEnergy.zip",
+    "DownloadLinkTesting": "https://raw.githubusercontent.com/Ryouta-Z/FF14_AOAOenergy_fixed/master/dist/AoAoEnergy.zip",
+    "Changelog": "适配国服版本 7.56。适配 Dalamud API 15。新增六档光效高度、按角色记忆、即时预览以及一键清除当前光效功能。"
   }
 ]

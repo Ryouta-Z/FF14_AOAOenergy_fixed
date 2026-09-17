@@ -143,7 +143,7 @@ namespace AoAoEnergy
                 PluginInterface.UiBuilder.OpenConfigUi += OpenConfiguration;
                 PluginInterface.UiBuilder.OpenMainUi += OpenConfiguration;
                 (CreateResultVfxHook ?? throw new InvalidOperationException("AoAoEnergy result VFX hook was not initialized.")).Enable();
-                PluginLog.Info("AoAoEnergy CN API 15 test build 1.0.4.1: configurable VFX offsets and active-effect clearing initialized; in-game VFX behavior remains unverified.");
+                PluginLog.Info("AoAoEnergy private fix 1.0.4.2 for CN 7.56 / API 15 initialized.");
             }
             catch
             {
