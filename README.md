@@ -6,6 +6,8 @@
 
 ## 安装与更新
 
+以下步骤以已经安装并能正常使用卫月框架（Dalamud）为前提。
+
 1. 在游戏中输入 `/xlsettings`。
 2. 打开“实验性功能”，在“自定义插件仓库”中添加：
    `https://raw.githubusercontent.com/Ryouta-Z/FF14_AOAOenergy_fixed/master/repo.json`
