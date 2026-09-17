@@ -101,10 +101,14 @@ namespace AoAoEnergy
         private delegate IntPtr CreateVfxDelegate(string path, GameObject* cast, GameObject* target, float speed, char a5, ushort a6, char a7);
         private CreateVfxDelegate CreateVfx;
 
+        private delegate IntPtr ActorVfxRemoveDelegate(IntPtr vfx, char a2);
+        private Hook<ActorVfxRemoveDelegate> ActorVfxRemoveHook;
+
         //private PenumbraService PenumbraService;
         private ResourceLoader ResourceLoader;
         private Configuration Configuration;
         private ConfigurationWindow ConfigurationWindow;
+        private readonly ActiveVfxTracker ActiveVfx = new();
 
         internal bool RememberPerCharacter => Configuration.OffsetProfiles.RememberPerCharacter;
         internal int SelectedOffsetIndex => Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
@@ -119,6 +123,9 @@ namespace AoAoEnergy
 
                 GameInteropProvider.InitializeFromAttributes(this);
                 this.CreateVfx = Marshal.GetDelegateForFunctionPointer<CreateVfxDelegate>(SigScanner.ScanText("40 53 55 56 57 48 81 EC ?? ?? ?? ?? 0F 29 B4 24 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 0F B6 AC 24 ?? ?? ?? ?? 0F 28 F3 49 8B F8"));
+                var removePointerOffset = SigScanner.ScanText("0F 11 48 10 48 8D 05") + 7;
+                var removeAddress = Marshal.ReadIntPtr(removePointerOffset + Marshal.ReadInt32(removePointerOffset) + 4);
+                ActorVfxRemoveHook = GameInteropProvider.HookFromAddress<ActorVfxRemoveDelegate>(removeAddress, ActorVfxRemoveDetour);
                 ResourceLoader = new ResourceLoader();
                 foreach (var preset in OffsetPresets)
                 {
@@ -128,11 +135,12 @@ namespace AoAoEnergy
                     ResourceLoader.AddReplace(preset.VirtualPath, replacement);
                 }
                 ResourceLoader.Enable();
+                ActorVfxRemoveHook.Enable();
                 PluginInterface.UiBuilder.Draw += ConfigurationWindow.Draw;
                 PluginInterface.UiBuilder.OpenConfigUi += OpenConfiguration;
                 PluginInterface.UiBuilder.OpenMainUi += OpenConfiguration;
                 (CreateResultVfxHook ?? throw new InvalidOperationException("AoAoEnergy result VFX hook was not initialized.")).Enable();
-                PluginLog.Info("AoAoEnergy CN API 15 test build 1.0.4.0: configurable VFX offsets initialized; in-game VFX behavior remains unverified.");
+                PluginLog.Info("AoAoEnergy CN API 15 test build 1.0.4.1: configurable VFX offsets and active-effect clearing initialized; in-game VFX behavior remains unverified.");
             }
             catch
             {
@@ -148,6 +156,7 @@ namespace AoAoEnergy
             PluginInterface.UiBuilder.OpenConfigUi -= OpenConfiguration;
             PluginInterface.UiBuilder.OpenMainUi -= OpenConfiguration;
             CreateResultVfxHook?.Dispose();
+            ActorVfxRemoveHook?.Dispose();
             ResourceLoader?.Dispose();
         }
 
@@ -168,6 +177,11 @@ namespace AoAoEnergy
             _ = Framework.RunOnFrameworkThread(PreviewOnFrameworkThread);
         }
 
+        internal void ClearActiveEffects()
+        {
+            _ = Framework.RunOnFrameworkThread(ClearActiveEffectsOnFrameworkThread);
+        }
+
         private void PreviewOnFrameworkThread()
         {
             var localPlayer = ObjectTable.LocalPlayer;
@@ -183,6 +197,18 @@ namespace AoAoEnergy
 
         private void OpenConfiguration() => ConfigurationWindow.IsOpen = true;
 
+        private IntPtr ActorVfxRemoveDetour(IntPtr vfx, char a2)
+        {
+            ActiveVfx.Untrack(vfx);
+            return ActorVfxRemoveHook.Original(vfx, a2);
+        }
+
+        private void ClearActiveEffectsOnFrameworkThread()
+        {
+            foreach (var vfx in ActiveVfx.Drain())
+                ActorVfxRemoveHook.Original(vfx, (char)1);
+        }
+
         private void SaveConfiguration() => PluginInterface.SavePluginConfig(Configuration);
 
         private static ulong GetCurrentContentId() => PlayerState.IsLoaded ? PlayerState.ContentId : 0;
@@ -190,7 +216,8 @@ namespace AoAoEnergy
         private void PlaySelectedVfx(GameObject* cast, GameObject* target)
         {
             var presetIndex = Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
-            CreateVfx?.Invoke(OffsetPresets[presetIndex].VirtualPath, cast, target, -1, (char)0, 0, (char)0);
+            var vfx = CreateVfx?.Invoke(OffsetPresets[presetIndex].VirtualPath, cast, target, -1, (char)0, 0, (char)0) ?? IntPtr.Zero;
+            ActiveVfx.Track(vfx);
         }
     }
 }

@@ -9,8 +9,8 @@
       "AVFX"
     ],
     "InternalName": "AoAoEnergy",
-    "AssemblyVersion": "1.0.4.0",
-    "TestingAssemblyVersion": "1.0.4.0",
+    "AssemblyVersion": "1.0.4.1",
+    "TestingAssemblyVersion": "1.0.4.1",
     "ApplicableVersion": "2026.09.01.0000.0000",
     "DalamudApiLevel": 15,
     "IsHide": false,

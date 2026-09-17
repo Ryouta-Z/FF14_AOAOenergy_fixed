@@ -40,7 +40,11 @@ internal sealed class ConfigurationWindow
         if (ImGui.Button("预览当前效果"))
             plugin.PreviewSelectedEffect();
 
-        ImGui.TextWrapped("预览不会消耗爆发药。其他角色未单独设置时，会使用全局选择。");
+        ImGui.SameLine();
+        if (ImGui.Button("清除当前光效"))
+            plugin.ClearActiveEffects();
+
+        ImGui.TextWrapped("预览不会消耗爆发药。“清除当前光效”只会移除本插件生成且仍在播放的光效。其他角色未单独设置时，会使用全局选择。");
         ImGui.End();
     }
 }

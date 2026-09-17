@@ -23,9 +23,9 @@ try {
     foreach ($field in @('InternalName','AssemblyVersion','DalamudApiLevel','ApplicableVersion')) {
         if ($manifest.$field -ne $repo.$field) { throw "Manifest/repo mismatch: $field" }
     }
-    if ($manifest.DalamudApiLevel -ne 15 -or $manifest.AssemblyVersion -ne '1.0.4.0') { throw 'Unexpected version' }
+    if ($manifest.DalamudApiLevel -ne 15 -or $manifest.AssemblyVersion -ne '1.0.4.1') { throw 'Unexpected version' }
     if ($manifest.ApplicableVersion -ne '2026.09.01.0000.0000') { throw 'Unexpected applicable game version' }
-    'PASS manifest/repo API 15, version 1.0.4.0, game 2026.09.01.0000.0000'
+    'PASS manifest/repo API 15, version 1.0.4.1, game 2026.09.01.0000.0000'
     foreach ($vfxFile in $vfxFiles) {
         $stream = $zip.GetEntry($vfxFile).Open()
         $sha = [Security.Cryptography.SHA256]::Create()

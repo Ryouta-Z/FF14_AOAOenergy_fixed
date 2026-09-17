@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\AoAoEnergy\ActiveVfxTracker.cs" Link="ActiveVfxTracker.cs" />
     <Compile Include="..\..\AoAoEnergy\OffsetProfileStore.cs" Link="OffsetProfileStore.cs" />
   </ItemGroup>
 </Project>

@@ -26,4 +26,14 @@ Equal(0, profiles.GetOffsetIndex(100), "position indices are clamped to the orig
 profiles.CharacterOffsetIndices = null!;
 Equal(4, profiles.GetOffsetIndex(100), "a null character map from an old or damaged config falls back safely");
 
+var activeVfx = new ActiveVfxTracker();
+activeVfx.Track((nint)0x111);
+activeVfx.Track((nint)0x222);
+activeVfx.Track((nint)0x222);
+activeVfx.Untrack((nint)0x111);
+var handlesToRemove = activeVfx.Drain();
+Equal(1, handlesToRemove.Count, "only live unique VFX instances are cleared");
+Equal(0x222, (int)handlesToRemove[0], "the remaining VFX handle is returned for removal");
+Equal(0, activeVfx.Drain().Count, "clearing the VFX list is idempotent");
+
 Console.WriteLine("PASS offset profile behavior");
