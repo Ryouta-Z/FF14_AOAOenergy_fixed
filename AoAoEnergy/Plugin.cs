@@ -27,6 +27,10 @@ namespace AoAoEnergy
         [PluginService]
         internal static IClientState ClientState { get; set; }
         [PluginService]
+        internal static IObjectTable ObjectTable { get; set; }
+        [PluginService]
+        internal static IPlayerState PlayerState { get; set; }
+        [PluginService]
         internal static IChatGui ChatGui { get; set; }
         [PluginService]
         internal static IDataManager DataManager { get; set; }
@@ -54,7 +58,25 @@ namespace AoAoEnergy
         //    throw new NotImplementedException();
         //}
 
-        internal const string AoAoVfxPath = "vfx/common/eff/ev_energydrink_01x_30s.avfx";
+        internal static readonly string[] OffsetLabels =
+        {
+            "原始位置（0 m）",
+            "上移 0.25 m",
+            "上移 0.50 m",
+            "上移 0.75 m",
+            "上移 1.00 m",
+            "上移 1.25 m",
+        };
+
+        private static readonly (string VirtualPath, string FileName)[] OffsetPresets =
+        {
+            ("vfx/common/eff/ev_energydrink_01x_30s.avfx", "ev_energydrink_01x_30s.avfx"),
+            ("vfx/common/eff/aoaoenergy_offset_025.avfx", "ev_energydrink_01x_30s_up_025.avfx"),
+            ("vfx/common/eff/aoaoenergy_offset_050.avfx", "ev_energydrink_01x_30s_up_050.avfx"),
+            ("vfx/common/eff/aoaoenergy_offset_075.avfx", "ev_energydrink_01x_30s_up_075.avfx"),
+            ("vfx/common/eff/aoaoenergy_offset_100.avfx", "ev_energydrink_01x_30s_up_100.avfx"),
+            ("vfx/common/eff/aoaoenergy_offset_125.avfx", "ev_energydrink_01x_30s_up_125.avfx"),
+        };
         private delegate void CreateResultVfxDelegate(ActionEffectHandler* actionHandler, Character* cast, Character* target, uint action, Effect* result);
         [Signature("48 85 D2 0F 84 ?? ?? ?? ?? 53 55 57", DetourName = nameof(CreateResultVfxDetour))]
         private Hook<CreateResultVfxDelegate> CreateResultVfxHook;
@@ -72,7 +94,7 @@ namespace AoAoEnergy
                     //{
                     //    PluginLog.Info($"{item.ActionId} {item.ActionType} {action}");
                     //}
-                    CreateVfx?.Invoke(AoAoVfxPath, &cast->GameObject, &target->GameObject, -1, (char)0, 0, (char)0);
+                    PlaySelectedVfx(&cast->GameObject, &target->GameObject);
                 }
             }
             else
@@ -87,22 +109,36 @@ namespace AoAoEnergy
 
         //private PenumbraService PenumbraService;
         private ResourceLoader ResourceLoader;
+        private Configuration Configuration;
+        private ConfigurationWindow ConfigurationWindow;
+
+        internal bool RememberPerCharacter => Configuration.OffsetProfiles.RememberPerCharacter;
+        internal int SelectedOffsetIndex => Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
 
         public Plugin()
         {
             try
             {
-                var replacement = Path.Combine(PluginInterface.AssemblyLocation.Directory!.FullName, "ev_energydrink_01x_30s.avfx");
-                if (!File.Exists(replacement) || replacement.Length >= 260)
-                    throw new InvalidOperationException("AoAoEnergy VFX file is missing or its path is too long. Extract the complete package to a shorter path.");
+                Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+                Configuration.OffsetProfiles ??= new OffsetProfileStore();
+                ConfigurationWindow = new ConfigurationWindow(this);
 
                 GameInteropProvider.InitializeFromAttributes(this);
                 this.CreateVfx = Marshal.GetDelegateForFunctionPointer<CreateVfxDelegate>(SigScanner.ScanText("40 53 55 56 57 48 81 EC ?? ?? ?? ?? 0F 29 B4 24 ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 0F B6 AC 24 ?? ?? ?? ?? 0F 28 F3 49 8B F8"));
                 ResourceLoader = new ResourceLoader();
-                ResourceLoader.AddReplace(AoAoVfxPath, replacement);
+                foreach (var preset in OffsetPresets)
+                {
+                    var replacement = Path.Combine(PluginInterface.AssemblyLocation.Directory!.FullName, preset.FileName);
+                    if (!File.Exists(replacement) || replacement.Length >= 260)
+                        throw new InvalidOperationException($"AoAoEnergy VFX file is missing or its path is too long: {preset.FileName}");
+                    ResourceLoader.AddReplace(preset.VirtualPath, replacement);
+                }
                 ResourceLoader.Enable();
+                PluginInterface.UiBuilder.Draw += ConfigurationWindow.Draw;
+                PluginInterface.UiBuilder.OpenConfigUi += OpenConfiguration;
+                PluginInterface.UiBuilder.OpenMainUi += OpenConfiguration;
                 (CreateResultVfxHook ?? throw new InvalidOperationException("AoAoEnergy result VFX hook was not initialized.")).Enable();
-                PluginLog.Info("AoAoEnergy CN API 15 test build 1.0.3.3: hooks initialized; verified offline against game 2026.09.01.0000.0000; in-game VFX behavior remains unverified.");
+                PluginLog.Info("AoAoEnergy CN API 15 test build 1.0.4.0: configurable VFX offsets initialized; in-game VFX behavior remains unverified.");
             }
             catch
             {
@@ -113,8 +149,49 @@ namespace AoAoEnergy
 
         public void Dispose()
         {
+            if (ConfigurationWindow != null)
+                PluginInterface.UiBuilder.Draw -= ConfigurationWindow.Draw;
+            PluginInterface.UiBuilder.OpenConfigUi -= OpenConfiguration;
+            PluginInterface.UiBuilder.OpenMainUi -= OpenConfiguration;
             CreateResultVfxHook?.Dispose();
             ResourceLoader?.Dispose();
+        }
+
+        internal void SetRememberPerCharacter(bool enabled)
+        {
+            Configuration.OffsetProfiles.RememberPerCharacter = enabled;
+            SaveConfiguration();
+        }
+
+        internal void SetSelectedOffsetIndex(int offsetIndex)
+        {
+            Configuration.OffsetProfiles.SetOffsetIndex(GetCurrentContentId(), offsetIndex);
+            SaveConfiguration();
+        }
+
+        internal void PreviewSelectedEffect()
+        {
+            var localPlayer = ObjectTable.LocalPlayer;
+            if (localPlayer == null || localPlayer.Address == IntPtr.Zero)
+            {
+                PluginLog.Warning("AoAoEnergy preview skipped because the local player is unavailable.");
+                return;
+            }
+
+            var character = (Character*)localPlayer.Address;
+            PlaySelectedVfx(&character->GameObject, &character->GameObject);
+        }
+
+        private void OpenConfiguration() => ConfigurationWindow.IsOpen = true;
+
+        private void SaveConfiguration() => PluginInterface.SavePluginConfig(Configuration);
+
+        private static ulong GetCurrentContentId() => PlayerState.IsLoaded ? PlayerState.ContentId : 0;
+
+        private void PlaySelectedVfx(GameObject* cast, GameObject* target)
+        {
+            var presetIndex = Configuration.OffsetProfiles.GetOffsetIndex(GetCurrentContentId());
+            CreateVfx?.Invoke(OffsetPresets[presetIndex].VirtualPath, cast, target, -1, (char)0, 0, (char)0);
         }
     }
 }

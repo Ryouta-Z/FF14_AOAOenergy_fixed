@@ -3,7 +3,15 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Package))
 try {
-    $required = @('AoAoEnergy.dll','AoAoEnergy.json','AoAoEnergy.deps.json','Penumbra.String.dll','Penumbra.String.xml','ev_energydrink_01x_30s.avfx')
+    $vfxFiles = @(
+        'ev_energydrink_01x_30s.avfx',
+        'ev_energydrink_01x_30s_up_025.avfx',
+        'ev_energydrink_01x_30s_up_050.avfx',
+        'ev_energydrink_01x_30s_up_075.avfx',
+        'ev_energydrink_01x_30s_up_100.avfx',
+        'ev_energydrink_01x_30s_up_125.avfx'
+    )
+    $required = @('AoAoEnergy.dll','AoAoEnergy.json','AoAoEnergy.deps.json','Penumbra.String.dll','Penumbra.String.xml') + $vfxFiles
     foreach ($name in $required) {
         $entry = $zip.GetEntry($name)
         if ($null -eq $entry -or $entry.Length -eq 0) { throw "Missing or empty: $name" }
@@ -15,15 +23,17 @@ try {
     foreach ($field in @('InternalName','AssemblyVersion','DalamudApiLevel','ApplicableVersion')) {
         if ($manifest.$field -ne $repo.$field) { throw "Manifest/repo mismatch: $field" }
     }
-    if ($manifest.DalamudApiLevel -ne 15 -or $manifest.AssemblyVersion -ne '1.0.3.3') { throw 'Unexpected version' }
+    if ($manifest.DalamudApiLevel -ne 15 -or $manifest.AssemblyVersion -ne '1.0.4.0') { throw 'Unexpected version' }
     if ($manifest.ApplicableVersion -ne '2026.09.01.0000.0000') { throw 'Unexpected applicable game version' }
-    'PASS manifest/repo API 15, version 1.0.3.3, game 2026.09.01.0000.0000'
-    $stream = $zip.GetEntry('ev_energydrink_01x_30s.avfx').Open()
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try { $assetHash = [Convert]::ToHexString($sha.ComputeHash($stream)) } finally { $stream.Dispose(); $sha.Dispose() }
-    $sourceHash = (Get-FileHash (Join-Path $PSScriptRoot 'AoAoEnergy/ev_energydrink_01x_30s.avfx')).Hash
-    if ($assetHash -ne $sourceHash) { throw 'VFX asset mismatch' }
-    "PASS AVFX unchanged: $assetHash"
+    'PASS manifest/repo API 15, version 1.0.4.0, game 2026.09.01.0000.0000'
+    foreach ($vfxFile in $vfxFiles) {
+        $stream = $zip.GetEntry($vfxFile).Open()
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $assetHash = [Convert]::ToHexString($sha.ComputeHash($stream)) } finally { $stream.Dispose(); $sha.Dispose() }
+        $sourceHash = (Get-FileHash (Join-Path $PSScriptRoot "AoAoEnergy/$vfxFile")).Hash
+        if ($assetHash -ne $sourceHash) { throw "VFX asset mismatch: $vfxFile" }
+        "PASS AVFX source match: $vfxFile ($assetHash)"
+    }
     if (@($zip.Entries | Where-Object { $_.FullName -match '(^|/)(Dalamud|FFXIVClientStructs)\.dll$' }).Count) {
         throw 'Host libraries must not be distributed in the plugin package'
     }
