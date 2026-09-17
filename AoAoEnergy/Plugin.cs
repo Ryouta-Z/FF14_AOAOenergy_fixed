@@ -8,9 +8,6 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using System.Runtime.InteropServices;
 using static FFXIVClientStructs.FFXIV.Client.Game.Character.ActionEffectHandler;
-//using Penumbra.Api.IpcSubscribers.Legacy;
-//using Penumbra.Api.Enums;
-
 namespace AoAoEnergy
 {
 
@@ -105,7 +102,6 @@ namespace AoAoEnergy
         private Hook<ActorVfxRemoveDelegate> ActorVfxRemoveHook;
         private const char ImmediateRemovalMode = (char)1;
 
-        //private PenumbraService PenumbraService;
         private ResourceLoader ResourceLoader;
         private Configuration Configuration;
         private ConfigurationWindow ConfigurationWindow;
