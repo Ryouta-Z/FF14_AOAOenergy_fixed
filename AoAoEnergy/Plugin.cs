@@ -58,25 +58,19 @@ namespace AoAoEnergy
         //    throw new NotImplementedException();
         //}
 
-        internal static readonly string[] OffsetLabels =
+        private readonly record struct OffsetPreset(string Label, string VirtualPath, string FileName);
+
+        private static readonly OffsetPreset[] OffsetPresets =
         {
-            "原始位置（0 m）",
-            "上移 0.25 m",
-            "上移 0.50 m",
-            "上移 0.75 m",
-            "上移 1.00 m",
-            "上移 1.25 m",
+            new("原始位置（0 m）", "vfx/common/eff/ev_energydrink_01x_30s.avfx", "ev_energydrink_01x_30s.avfx"),
+            new("上移 0.25 m", "vfx/common/eff/aoaoenergy_offset_025.avfx", "ev_energydrink_01x_30s_up_025.avfx"),
+            new("上移 0.50 m", "vfx/common/eff/aoaoenergy_offset_050.avfx", "ev_energydrink_01x_30s_up_050.avfx"),
+            new("上移 0.75 m", "vfx/common/eff/aoaoenergy_offset_075.avfx", "ev_energydrink_01x_30s_up_075.avfx"),
+            new("上移 1.00 m", "vfx/common/eff/aoaoenergy_offset_100.avfx", "ev_energydrink_01x_30s_up_100.avfx"),
+            new("上移 1.25 m", "vfx/common/eff/aoaoenergy_offset_125.avfx", "ev_energydrink_01x_30s_up_125.avfx"),
         };
 
-        private static readonly (string VirtualPath, string FileName)[] OffsetPresets =
-        {
-            ("vfx/common/eff/ev_energydrink_01x_30s.avfx", "ev_energydrink_01x_30s.avfx"),
-            ("vfx/common/eff/aoaoenergy_offset_025.avfx", "ev_energydrink_01x_30s_up_025.avfx"),
-            ("vfx/common/eff/aoaoenergy_offset_050.avfx", "ev_energydrink_01x_30s_up_050.avfx"),
-            ("vfx/common/eff/aoaoenergy_offset_075.avfx", "ev_energydrink_01x_30s_up_075.avfx"),
-            ("vfx/common/eff/aoaoenergy_offset_100.avfx", "ev_energydrink_01x_30s_up_100.avfx"),
-            ("vfx/common/eff/aoaoenergy_offset_125.avfx", "ev_energydrink_01x_30s_up_125.avfx"),
-        };
+        internal static readonly string[] OffsetLabels = OffsetPresets.Select(preset => preset.Label).ToArray();
         private delegate void CreateResultVfxDelegate(ActionEffectHandler* actionHandler, Character* cast, Character* target, uint action, Effect* result);
         [Signature("48 85 D2 0F 84 ?? ?? ?? ?? 53 55 57", DetourName = nameof(CreateResultVfxDetour))]
         private Hook<CreateResultVfxDelegate> CreateResultVfxHook;
@@ -170,6 +164,11 @@ namespace AoAoEnergy
         }
 
         internal void PreviewSelectedEffect()
+        {
+            _ = Framework.RunOnFrameworkThread(PreviewOnFrameworkThread);
+        }
+
+        private void PreviewOnFrameworkThread()
         {
             var localPlayer = ObjectTable.LocalPlayer;
             if (localPlayer == null || localPlayer.Address == IntPtr.Zero)

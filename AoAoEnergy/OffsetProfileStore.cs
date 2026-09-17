@@ -2,12 +2,18 @@ namespace AoAoEnergy;
 
 internal sealed class OffsetProfileStore
 {
+    private Dictionary<ulong, int> characterOffsetIndices = new();
+
     internal const int MinimumOffsetIndex = 0;
     internal const int MaximumOffsetIndex = 5;
 
     public bool RememberPerCharacter { get; set; }
     public int GlobalOffsetIndex { get; set; }
-    public Dictionary<ulong, int> CharacterOffsetIndices { get; set; } = new();
+    public Dictionary<ulong, int> CharacterOffsetIndices
+    {
+        get => characterOffsetIndices;
+        set => characterOffsetIndices = value ?? new Dictionary<ulong, int>();
+    }
 
     public int GetOffsetIndex(ulong contentId)
     {

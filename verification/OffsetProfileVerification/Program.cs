@@ -23,4 +23,7 @@ Equal(5, profiles.GetOffsetIndex(100), "position indices are clamped to the high
 profiles.SetOffsetIndex(100, -10);
 Equal(0, profiles.GetOffsetIndex(100), "position indices are clamped to the original preset");
 
+profiles.CharacterOffsetIndices = null!;
+Equal(4, profiles.GetOffsetIndex(100), "a null character map from an old or damaged config falls back safely");
+
 Console.WriteLine("PASS offset profile behavior");
